@@ -1,0 +1,15 @@
+# WireGuard generated secrets and runtime configurations
+/azure/keys/
+/home/keys/
+/azure/wg0.conf
+/home/wg0.conf
+
+# Minecraft local runtime data and environment
+/home/.env
+/home/data/
+
+# macOS metadata
+.DS_Store
+
+# Local agent operation records
+/.agent/unknowns/
