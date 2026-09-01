@@ -1,0 +1,23 @@
+table ip mc_relay {
+    chain prerouting {
+        type nat hook prerouting priority dstnat;
+        policy accept;
+
+        iifname "__WAN_IF__" udp dport 19132 dnat to 10.77.0.2:19132
+    }
+
+    chain postrouting {
+        type nat hook postrouting priority srcnat;
+        policy accept;
+
+        oifname "wg0" ip daddr 10.77.0.2 udp dport 19132 snat to 10.77.0.1
+    }
+
+    chain forward {
+        type filter hook forward priority filter;
+        policy accept;
+
+        iifname "__WAN_IF__" oifname "wg0" ip daddr 10.77.0.2 udp dport 19132 accept
+        iifname "wg0" oifname "__WAN_IF__" ip saddr 10.77.0.2 ct state established,related accept
+    }
+}

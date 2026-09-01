@@ -1,0 +1,8 @@
+[Interface]
+Address = 10.77.0.1/24
+ListenPort = 51820
+PrivateKey = __AZURE_PRIVATE_KEY__
+
+[Peer]
+PublicKey = __HOME_PUBLIC_KEY__
+AllowedIPs = 10.77.0.2/32
