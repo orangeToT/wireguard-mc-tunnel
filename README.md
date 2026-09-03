@@ -1,48 +1,48 @@
-# Minecraft Bedrock over Azure + WireGuard
+# Azure + WireGuard 経由の Minecraft Bedrock サーバー公開
 
-This bundle implements the simple, low-overhead design:
+この一式は、シンプルでオーバーヘッドの小さい次の構成を実現します。
 
 ```text
-Minecraft player
+Minecraft プレイヤー
     |
     | UDP 19132
     v
-Azure VM (public IPv4)
+Azure VM（パブリック IPv4）
     |  nftables DNAT/SNAT
     v
 wg0 10.77.0.1
     |
     | WireGuard UDP 51820
     v
-Home/PVE LXC wg0 10.77.0.2
+自宅/PVE LXC wg0 10.77.0.2
     |
     v
-Minecraft Bedrock container (Docker host network, UDP 19132)
+Minecraft Bedrock コンテナ（Dockerホストネットワーク、UDP 19132）
 ```
 
-## Design goals
+## 設計目標
 
-- No port-forwarding on the home router.
-- No WireGuard interface on the PVE host.
-- No Docker bridge/NAT in front of Minecraft.
-- WireGuard runs natively inside the Azure VM and the Minecraft LXC.
-- Azure only forwards UDP/19132 through the tunnel.
-- Minecraft traffic from Azure to home is SNATed to `10.77.0.1`, so return routing stays simple.
-- Because of SNAT, Minecraft does **not** see the original player IP addresses.
+- 自宅ルーターでポートフォワーディングを行わない。
+- PVEホスト上にWireGuardインターフェースを作成しない。
+- Minecraftの手前にDockerブリッジやNATを置かない。
+- WireGuardをAzure VMとMinecraft用LXCの内部で直接動作させる。
+- Azureからトンネルへ転送するのはUDP/19132だけにする。
+- Azureから自宅へのMinecraft通信を`10.77.0.1`にSNATし、戻りの経路制御を単純にする。
+- SNATを使用するため、Minecraftからプレイヤー本来のIPアドレスは**見えない**。
 
-## Assumptions
+## 前提条件
 
-- Azure VM: Debian/Ubuntu Linux with a public IPv4.
-- Home side: Debian/Ubuntu unprivileged LXC with Docker installed.
-- WireGuard subnet: `10.77.0.0/24`.
-- Azure WireGuard address: `10.77.0.1`.
-- Home WireGuard address: `10.77.0.2`.
-- Minecraft Bedrock UDP port: `19132`.
-- WireGuard UDP port: `51820`.
+- Azure VM：パブリックIPv4を持つDebian/Ubuntu Linux。
+- 自宅側：DockerをインストールしたDebian/Ubuntuの非特権LXC。
+- WireGuardサブネット：`10.77.0.0/24`。
+- Azure側のWireGuardアドレス：`10.77.0.1`。
+- 自宅側のWireGuardアドレス：`10.77.0.2`。
+- Minecraft BedrockのUDPポート：`19132`。
+- WireGuardのUDPポート：`51820`。
 
-## 1. Generate keys
+## 1. 鍵を生成する
 
-Run on Azure:
+Azure側で実行します。
 
 ```bash
 cd azure
@@ -50,7 +50,7 @@ sudo ./generate-keys.sh
 cat keys/public.key
 ```
 
-Run on the home LXC:
+自宅のLXC側で実行します。
 
 ```bash
 cd home
@@ -58,141 +58,141 @@ sudo ./generate-keys.sh
 cat keys/public.key
 ```
 
-Exchange only the **public** keys. Never send or commit `private.key`.
+交換するのは**公開鍵**だけです。`private.key`は送信したりコミットしたりしないでください。
 
-## 2. Configure Azure
+## 2. Azureを設定する
 
-Copy the example:
+設定例をコピーします。
 
 ```bash
 cd azure
 cp wg0.conf.example wg0.conf
 ```
 
-Edit `wg0.conf`:
+`wg0.conf`を編集します。
 
-- Replace `__AZURE_PRIVATE_KEY__` with `keys/private.key` contents.
-- Replace `__HOME_PUBLIC_KEY__` with the home `keys/public.key` contents.
+- `__AZURE_PRIVATE_KEY__`を`keys/private.key`の内容に置き換える。
+- `__HOME_PUBLIC_KEY__`を自宅側の`keys/public.key`の内容に置き換える。
 
-Then install:
+続いてインストールします。
 
 ```bash
 sudo ./setup.sh
 ```
 
-The script:
+このスクリプトは次の処理を行います。
 
-- installs WireGuard and nftables,
-- enables IPv4 forwarding,
-- installs `/etc/wireguard/wg0.conf`,
-- detects the Azure VM's default-route interface,
-- installs an nftables rule set that forwards only UDP/19132,
-- enables and starts WireGuard and the nftables relay service.
+- WireGuardとnftablesをインストールする。
+- IPv4フォワーディングを有効にする。
+- `/etc/wireguard/wg0.conf`をインストールする。
+- Azure VMのデフォルトルートに使用されているインターフェースを検出する。
+- UDP/19132だけを転送するnftablesルールセットをインストールする。
+- WireGuardとnftablesリレーサービスを有効化して起動する。
 
 ### Azure NSG
 
-Allow inbound:
+次の受信通信を許可します。
 
-- UDP 19132 from `Internet` (Minecraft)
-- UDP 51820 from `Internet` (WireGuard)
-- TCP 22 only from your administrative IP, if SSH is used
+- `Internet`からのUDP 19132（Minecraft）
+- `Internet`からのUDP 51820（WireGuard）
+- SSHを使用する場合、管理元IPからのTCP 22のみ
 
-No other inbound rules are required for this tunnel.
+このトンネルに必要な受信規則は以上です。
 
-## 3. Configure the home LXC
+## 3. 自宅のLXCを設定する
 
-If WireGuard works natively inside the LXC, no `/dev/net/tun` passthrough is needed. If `wg-quick` fails because WireGuard support is unavailable, load the WireGuard kernel module on the PVE host:
+LXC内でWireGuardが直接動作する場合、`/dev/net/tun`のパススルーは必要ありません。WireGuardを利用できず`wg-quick`が失敗する場合は、PVEホストでWireGuardカーネルモジュールを読み込みます。
 
 ```bash
 modprobe wireguard
 ```
 
-This loads the kernel module only; it does not create `wg0` on the PVE host.
+これはカーネルモジュールを読み込むだけであり、PVEホスト上に`wg0`を作成するものではありません。
 
-On the home LXC:
+自宅のLXC側で次を実行します。
 
 ```bash
 cd home
 cp wg0.conf.example wg0.conf
 ```
 
-Edit `wg0.conf`:
+`wg0.conf`を編集します。
 
-- Replace `__HOME_PRIVATE_KEY__` with `keys/private.key` contents.
-- Replace `__AZURE_PUBLIC_KEY__` with the Azure `keys/public.key` contents.
-- Replace `__AZURE_PUBLIC_IP__` with the Azure VM public IPv4.
+- `__HOME_PRIVATE_KEY__`を`keys/private.key`の内容に置き換える。
+- `__AZURE_PUBLIC_KEY__`をAzure側の`keys/public.key`の内容に置き換える。
+- `__AZURE_PUBLIC_IP__`をAzure VMのパブリックIPv4に置き換える。
 
-Then:
+続いて実行します。
 
 ```bash
 sudo ./setup.sh
 ```
 
-## 4. Start Minecraft
+## 4. Minecraftを起動する
 
-Edit `.env` if desired, then:
+必要に応じて`.env`を編集し、次を実行します。
 
 ```bash
 docker compose up -d
 ```
 
-`compose.yaml` uses `network_mode: host`, but this is the **LXC's** network namespace, not the PVE host network namespace.
+`compose.yaml`は`network_mode: host`を使用しますが、ここでのホストネットワークはPVEホストではなく、**LXCの**ネットワーク名前空間です。
 
-Minecraft listens on UDP/19132 and is therefore reachable through `wg0` at `10.77.0.2:19132`.
+MinecraftはUDP/19132で待ち受けるため、`wg0`を経由して`10.77.0.2:19132`で到達できます。
 
-## 5. Verify
+## 5. 動作を確認する
 
-Azure:
-
-```bash
-sudo ./check.sh
-```
-
-Home LXC:
+Azure側で実行します。
 
 ```bash
 sudo ./check.sh
 ```
 
-Expected basic state:
+自宅のLXC側で実行します。
 
-- `wg show` displays a recent handshake.
-- Azure can `ping 10.77.0.2`.
-- Home can `ping 10.77.0.1`.
-- Home shows Minecraft listening on UDP/19132.
+```bash
+sudo ./check.sh
+```
 
-Finally, connect a Bedrock client to:
+基本的に、次の状態になっていることを確認します。
+
+- `wg show`に最近のハンドシェイクが表示される。
+- Azureから`10.77.0.2`へ`ping`が通る。
+- 自宅から`10.77.0.1`へ`ping`が通る。
+- 自宅側でMinecraftがUDP/19132を待ち受けている。
+
+最後に、Bedrockクライアントから次のアドレスへ接続します。
 
 ```text
 <AZURE_PUBLIC_IPV4>:19132
 ```
 
-## Updating / removing
+## 更新と削除
 
-WireGuard configs:
+WireGuard設定を反映する場合は、次を実行します。
 
 ```bash
 sudo systemctl restart wg-quick@wg0
 ```
 
-Azure relay rules:
+Azureのリレールールを反映する場合は、次を実行します。
 
 ```bash
 sudo systemctl restart mc-relay-nft
 ```
 
-Remove only the custom Azure nftables table:
+Azureに追加したnftablesテーブルだけを削除する場合は、次を実行します。
 
 ```bash
 sudo nft delete table ip mc_relay
 ```
 
-This bundle intentionally does not flush the machine's entire nftables ruleset.
+この一式は、マシン上のnftablesルールセット全体を意図的にフラッシュしません。
 
-## Security notes
+## セキュリティ上の注意
 
-- Keep both WireGuard private keys secret and mode `0600`.
-- Use Azure NSG as the outer firewall.
-- Keep `online-mode=true` and an allow-list on the Bedrock server for private servers.
-- The Azure relay intentionally exposes only UDP/19132 to the WireGuard peer.
-- This simple design uses SNAT, so every player appears to the home side as `10.77.0.1` at the IP layer.
+- 両方のWireGuard秘密鍵を外部に漏らさず、権限を`0600`に保つ。
+- 外側のファイアウォールとしてAzure NSGを使用する。
+- 非公開のBedrockサーバーでは`online-mode=true`とallowlistを維持する。
+- AzureリレーからWireGuardピアへ公開するのは、意図的にUDP/19132だけとしている。
+- このシンプルな構成ではSNATを使用するため、IPレイヤー上、自宅側ではすべてのプレイヤーが`10.77.0.1`に見える。
