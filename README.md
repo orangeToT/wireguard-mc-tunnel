@@ -133,27 +133,48 @@ sudo ./setup.sh
 
 ## 4. Minecraftを起動する
 
-必要に応じて`home/.env.example`を`home/.env`へコピーして編集し、LXC内の`home`ディレクトリから次を実行します。通常の起動では既存のBedrockサーバーだけが起動します。
+BedrockとJavaは別々のComposeプロジェクトです。どちらもLXCのホストネットワークを使用しますが、BedrockはUDP/19132、JavaはTCP/25565で待ち受けるため、片方ずつでも同時でも起動できます。ここでのホストネットワークはPVEホストではなく、**LXCの**ネットワーク名前空間です。以下の`cd home/...`はリポジトリのルートから実行します。
+
+### Bedrock版
+
+自宅のLXCで`home/be`へ移動し、必要に応じて`.env`を編集します。
 
 ```bash
+cd home/be
+cp -n .env.example .env
 docker compose up -d
 ```
 
-`compose.yaml`は`network_mode: host`を使用しますが、ここでのホストネットワークはPVEホストではなく、**LXCの**ネットワーク名前空間です。
+Bedrockのワールドは`home/be/data/`に保存します。`wg0`を経由して`10.77.0.2:19132`で到達できます。停止・再起動も`home/be`で`docker compose stop`・`docker compose up -d`を実行します。
 
-BedrockはUDP/19132で待ち受けるため、`wg0`を経由して`10.77.0.2:19132`で到達できます。
+### Java版
 
-### Java版も起動する
-
-Java版の利用規約を確認し、同意する場合に限り`home/.env`で`JAVA_EULA=TRUE`にします。参加を許可するJavaプロフィール名を`JAVA_WHITELIST`にカンマ区切りで設定します。Xboxのゲーマータグとは異なる場合があります。Java版は標準でオンライン認証とホワイトリストを有効にし、RCONを無効にしています。ホワイトリストが空なら参加者は登録されません。
+自宅のLXCで`home/java`へ移動します。Java版の利用規約を確認し、同意する場合に限り`.env`で`EULA=TRUE`にします。参加を許可するJavaプロフィール名を`WHITELIST`にカンマ区切りで設定します。Xboxのゲーマータグとは異なる場合があります。Java版は標準でオンライン認証とホワイトリストを有効にし、RCONを無効にしています。初回起動時にホワイトリストが空なら参加者は登録されません。
 
 ```bash
-docker compose --profile java up -d
+cd home/java
+cp -n .env.example .env
+# .envのEULAとWHITELISTを確認・編集してから実行する
+docker compose up -d
 ```
 
-このコマンドはBedrockとJavaの両サービスを起動します。Javaだけを停止する場合は`docker compose --profile java stop minecraft-java`を実行します。Javaのワールドは`home/java-data/`に保存し、既存のBedrock用`home/data/`には触れません。Java版はTCP/25565を使用します。LXCにファイアウォールがある場合は、少なくとも`wg0`からのTCP/25565を許可してください。`network_mode: host`なので、LXCのほかのインターフェースからの到達範囲もファイアウォールで確認してください。
+Javaのワールドは`home/java/data/`に保存します。停止・再起動も`home/java`で`docker compose stop`・`docker compose up -d`を実行します。このCompose操作はBedrockコンテナを停止・再作成しません。LXCにファイアウォールがある場合は、少なくとも`wg0`からのTCP/25565を許可してください。`network_mode: host`なので、LXCのほかのインターフェースからの到達範囲もファイアウォールで確認してください。
 
-`JAVA_VERSION=LATEST`と`itzg/minecraft-server:latest`は更新時に内容が変わります。バージョンを固定して運用する場合は、両方の値を確認して指定してください。`JAVA_MEMORY`の既定値は`1G`です。必要なメモリ量はワールドや参加人数に合わせて調整してください。
+`VERSION=LATEST`と`itzg/minecraft-server:latest`は更新時に内容が変わります。バージョンを固定して運用する場合は、両方の値を確認して指定してください。`MEMORY`の既定値は`1G`です。必要なメモリ量はワールドや参加人数に合わせて調整してください。
+
+### 以前の`home/compose.yaml`から移行する場合
+
+以前の構成をLXCで稼働させている場合は、**旧Composeファイルを更新で置き換える前に**`home`で`docker compose --profile java down`を実行して両コンテナを停止・削除します。`-v`は付けません。旧構成の`home/data/`と`home/java-data/`、`home/.env`は削除しないでください。
+
+新しいファイルを取得したら、新構成を起動する前に、存在するデータを次のようにコピーします。コピー先の`be/data`・`java/data`がまだ存在しないことと、コピーに必要な空き容量を確認してください。権限のためにコピーできない場合は`sudo cp -a`を使用します。元のデータは残します。
+
+```bash
+cd home
+cp -a data be/data             # 旧Bedrockのデータがある場合
+cp -a java-data java/data      # 旧Javaのデータがある場合
+```
+
+`be/.env.example`と`java/.env.example`をそれぞれの`.env`へコピーし、旧`home/.env`を参照して値を移します。Javaの旧`JAVA_EULA`・`JAVA_WHITELIST`などは、新しい`EULA`・`WHITELIST`などに対応します。新しい両サービスのデータと設定を確認してから、それぞれのディレクトリで起動してください。
 
 ## 5. 動作を確認する
 

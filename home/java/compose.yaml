@@ -1,0 +1,21 @@
+services:
+  minecraft-java:
+    image: itzg/minecraft-server:latest
+    container_name: minecraft-java
+    network_mode: host
+    environment:
+      EULA: "${EULA:-FALSE}"
+      TYPE: "VANILLA"
+      VERSION: "${VERSION:-LATEST}"
+      SERVER_PORT: "25565"
+      MOTD: "${MOTD:-Java Server}"
+      MODE: "${MODE:-survival}"
+      DIFFICULTY: "${DIFFICULTY:-normal}"
+      ONLINE_MODE: "TRUE"
+      ENABLE_WHITELIST: "TRUE"
+      WHITELIST: "${WHITELIST:-}"
+      ENABLE_RCON: "FALSE"
+      MEMORY: "${MEMORY:-1G}"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

@@ -8,6 +8,10 @@
 /home/.env
 /home/data/
 /home/java-data/
+/home/be/.env
+/home/be/data/
+/home/java/.env
+/home/java/data/
 
 # macOS metadata
 .DS_Store

@@ -25,5 +25,10 @@ echo '=== Minecraft Java TCP/25565 listener ==='
 ss -ltnp | grep -E '(:25565\b|Local Address)' || true
 
 echo
-echo '=== Docker containers ==='
-docker compose --profile java ps 2>/dev/null || docker ps || true
+echo '=== Bedrock Compose ==='
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+(cd "$script_dir/be" && docker compose ps) || true
+
+echo
+echo '=== Java Compose ==='
+(cd "$script_dir/java" && docker compose ps) || true
