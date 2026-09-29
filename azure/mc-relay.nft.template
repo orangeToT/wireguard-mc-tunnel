@@ -4,6 +4,7 @@ table ip mc_relay {
         policy accept;
 
         iifname "__WAN_IF__" udp dport 19132 dnat to 10.77.0.2:19132
+        iifname "__WAN_IF__" tcp dport 25565 dnat to 10.77.0.2:25565
     }
 
     chain postrouting {
@@ -11,6 +12,7 @@ table ip mc_relay {
         policy accept;
 
         oifname "wg0" ip daddr 10.77.0.2 udp dport 19132 snat to 10.77.0.1
+        oifname "wg0" ip daddr 10.77.0.2 tcp dport 25565 snat to 10.77.0.1
     }
 
     chain forward {
@@ -18,6 +20,7 @@ table ip mc_relay {
         policy accept;
 
         iifname "__WAN_IF__" oifname "wg0" ip daddr 10.77.0.2 udp dport 19132 accept
+        iifname "__WAN_IF__" oifname "wg0" ip daddr 10.77.0.2 tcp dport 25565 accept
         iifname "wg0" oifname "__WAN_IF__" ip saddr 10.77.0.2 ct state established,related accept
     }
 }

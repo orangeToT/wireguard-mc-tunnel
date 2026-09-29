@@ -21,5 +21,9 @@ echo '=== Minecraft UDP/19132 listener ==='
 ss -lunp | grep -E '(:19132\b|Local Address)' || true
 
 echo
+echo '=== Minecraft Java TCP/25565 listener ==='
+ss -ltnp | grep -E '(:25565\b|Local Address)' || true
+
+echo
 echo '=== Docker containers ==='
-docker compose ps 2>/dev/null || docker ps || true
+docker compose --profile java ps 2>/dev/null || docker ps || true

@@ -7,6 +7,7 @@
 # Minecraft local runtime data and environment
 /home/.env
 /home/data/
+/home/java-data/
 
 # macOS metadata
 .DS_Store
