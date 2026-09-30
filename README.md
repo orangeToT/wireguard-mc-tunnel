@@ -133,15 +133,14 @@ sudo ./setup.sh
 
 ## 4. Minecraftを起動する
 
-BedrockとJavaは別々のComposeプロジェクトです。どちらもLXCのホストネットワークを使用しますが、BedrockはUDP/19132、JavaはTCP/25565で待ち受けるため、片方ずつでも同時でも起動できます。ここでのホストネットワークはPVEホストではなく、**LXCの**ネットワーク名前空間です。以下の`cd home/...`はリポジトリのルートから実行します。
+BedrockとJavaは別々のComposeプロジェクトです。設定は各`compose.yaml`の`environment`に直接記述し、`.env`は使用しません。どちらもLXCのホストネットワークを使用しますが、BedrockはUDP/19132、JavaはTCP/25565で待ち受けるため、片方ずつでも同時でも起動できます。ここでのホストネットワークはPVEホストではなく、**LXCの**ネットワーク名前空間です。以下の`cd home/...`はリポジトリのルートから実行します。
 
 ### Bedrock版
 
-自宅のLXCで`home/be`へ移動し、必要に応じて`.env`を編集します。
+自宅のLXCで`home/be`へ移動し、必要に応じて`compose.yaml`のサーバー名・ゲームモード・難易度などを編集します。
 
 ```bash
 cd home/be
-cp -n .env.example .env
 docker compose up -d
 ```
 
@@ -149,18 +148,24 @@ Bedrockのワールドは`home/be/data/`に保存します。`wg0`を経由し�
 
 ### Java版
 
-自宅のLXCで`home/java`へ移動します。Java版の利用規約を確認し、同意する場合に限り`.env`で`EULA=TRUE`にします。参加を許可するJavaプロフィール名を`WHITELIST`にカンマ区切りで設定します。Xboxのゲーマータグとは異なる場合があります。Java版は標準でオンライン認証とホワイトリストを有効にし、RCONを無効にしています。初回起動時にホワイトリストが空なら参加者は登録されません。
+自宅のLXCで`home/java`へ移動します。Java版はPurpurを使用し、`compose.yaml`に`EULA: "TRUE"`を記述しています。起動する前にJava版の利用規約への同意を確認してください。バージョンやメモリ量を指定する場合は、`environment`の`VERSION`・`MEMORY`を直接編集します。
+
+ホワイトリストの有効化は標準設定に含めていません。参加者を限定する場合は、`ENABLE_WHITELIST: "TRUE"`を有効にし、`WHITELIST: "player1,player2"`のようにJavaプロフィール名を設定します。Xboxのゲーマータグとは異なる場合があります。既存データを使用する場合は、`data/server.properties`に残っている設定も確認してください。
 
 ```bash
 cd home/java
-cp -n .env.example .env
-# .envのEULAとWHITELISTを確認・編集してから実行する
 docker compose up -d
 ```
 
 Javaのワールドは`home/java/data/`に保存します。停止・再起動も`home/java`で`docker compose stop`・`docker compose up -d`を実行します。このCompose操作はBedrockコンテナを停止・再作成しません。LXCにファイアウォールがある場合は、少なくとも`wg0`からのTCP/25565を許可してください。`network_mode: host`なので、LXCのほかのインターフェースからの到達範囲もファイアウォールで確認してください。
 
-`VERSION=LATEST`と`itzg/minecraft-server:latest`は更新時に内容が変わります。バージョンを固定して運用する場合は、両方の値を確認して指定してください。`MEMORY`の既定値は`1G`です。必要なメモリ量はワールドや参加人数に合わせて調整してください。
+`VERSION`を指定していないためサーバーバージョンは固定されていません。バージョンを固定して運用する場合は、`VERSION`・`PURPUR_BUILD`とイメージのタグを確認して指定してください。`MEMORY`の既定値は`1G`です。必要なメモリ量はワールドや参加人数に合わせて調整してください。
+
+RCONはコンテナ内部の`rcon-cli`で管理コマンドを実行するために有効にしています。例えば、`home/java`で次を実行すると参加中のプレイヤーを確認できます。
+
+```bash
+docker compose exec minecraft rcon-cli list
+```
 
 ### 以前の`home/compose.yaml`から移行する場合
 
@@ -174,7 +179,7 @@ cp -a data be/data             # 旧Bedrockのデータがある場合
 cp -a java-data java/data      # 旧Javaのデータがある場合
 ```
 
-`be/.env.example`と`java/.env.example`をそれぞれの`.env`へコピーし、旧`home/.env`を参照して値を移します。Javaの旧`JAVA_EULA`・`JAVA_WHITELIST`などは、新しい`EULA`・`WHITELIST`などに対応します。新しい両サービスのデータと設定を確認してから、それぞれのディレクトリで起動してください。
+設定は各`compose.yaml`の`environment`へ直接移します。旧`home/.env`を使用していた場合は、その値を参照してください。Javaの旧`JAVA_EULA`・`JAVA_WHITELIST`などは`EULA`・`WHITELIST`などに対応します。新しい両サービスのデータと設定を確認してから、それぞれのディレクトリで起動してください。
 
 ## 5. 動作を確認する
 
@@ -233,6 +238,6 @@ sudo nft delete table ip mc_relay
 - 両方のWireGuard秘密鍵を外部に漏らさず、権限を`0600`に保つ。
 - 外側のファイアウォールとしてAzure NSGを使用する。
 - 非公開のBedrockサーバーでは`online-mode=true`とallowlistを維持する。
-- Java版では`ONLINE_MODE=TRUE`とホワイトリストを維持する。
+- 参加者を限定するJavaサーバーでは、`compose.yaml`でホワイトリストを有効にして参加者を登録する。
 - AzureリレーからWireGuardピアへ公開するMinecraft通信は、意図的にUDP/19132とTCP/25565だけとしている。
 - このシンプルな構成ではSNATを使用するため、IPレイヤー上、自宅側ではすべてのプレイヤーが`10.77.0.1`に見える。

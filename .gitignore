@@ -5,16 +5,10 @@
 /home/wg0.conf
 
 # Minecraft local runtime data and environment
-/home/.env
-/home/data/
-/home/java-data/
-/home/be/.env
 /home/be/data/
-/home/java/.env
+/home/be/.env
 /home/java/data/
+/home/java/.env
 
 # macOS metadata
 .DS_Store
-
-# Local agent operation records
-/.agent/unknowns/

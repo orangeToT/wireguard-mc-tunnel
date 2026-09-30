@@ -1,15 +1,15 @@
 services:
   minecraft:
     image: itzg/minecraft-bedrock-server:latest
-    container_name: minecraft-bedrock
+    # container_name: bedrock
     network_mode: host
     environment:
       EULA: "TRUE"
-      SERVER_NAME: "${SERVER_NAME:-Bedrock Server}"
-      GAMEMODE: "${GAMEMODE:-survival}"
-      DIFFICULTY: "${DIFFICULTY:-normal}"
-      ALLOW_LIST: "${ALLOW_LIST:-true}"
-      ONLINE_MODE: "${ONLINE_MODE:-true}"
+      SERVER_NAME: "Bedrock Server"
+      GAMEMODE: "survival"
+      DIFFICULTY: "normal"
+      ALLOW_LIST: "true"
+      ONLINE_MODE: "true"
     volumes:
       - ./data:/data
     restart: unless-stopped
